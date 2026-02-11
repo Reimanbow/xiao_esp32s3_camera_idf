@@ -10,8 +10,7 @@
 
 static const char *TAG = "main";
 
-#define CAPTURE_INTERVAL_MS 5000
-#define IMG_BUF_SIZE        (100 * 1024)
+#define IMG_BUF_SIZE (100 * 1024)
 
 static void make_filename(char *buf, size_t buf_len, int seq)
 {
@@ -53,7 +52,7 @@ static void capture_loop(void)
         esp_err_t ret = camera_get_image(img_buf, IMG_BUF_SIZE, &img_size);
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "Failed to capture image");
-            vTaskDelay(pdMS_TO_TICKS(CAPTURE_INTERVAL_MS));
+            vTaskDelay(pdMS_TO_TICKS(CONFIG_CAPTURE_INTERVAL_MS));
             continue;
         }
 
@@ -68,7 +67,7 @@ static void capture_loop(void)
             ESP_LOGE(TAG, "Failed to write %s", path);
         }
 
-        vTaskDelay(pdMS_TO_TICKS(CAPTURE_INTERVAL_MS));
+        vTaskDelay(pdMS_TO_TICKS(CONFIG_CAPTURE_INTERVAL_MS));
     }
 }
 

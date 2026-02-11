@@ -1,0 +1,10 @@
+menu "App Configuration"
+
+    config CAPTURE_INTERVAL_MS
+        int "Capture interval (ms)"
+        default 5000
+        range 1000 3600000
+        help
+            Interval between image captures in milliseconds.
+
+endmenu

@@ -1,23 +1,27 @@
-# idf-template
+# xiao_sd_logger
 
-ESP-IDF の開発環境テンプレート。Docker + [just](https://github.com/casey/just) でホストへの ESP-IDF インストール不要。
+XIAO ESP32S3 Sense のカメラで定期的に JPEG 画像を撮影し、SD カードに連番で保存するロガー。
 
-```bash
-gh repo clone <ユーザー名>/idf-template my-project
-# または
-git clone <リポジトリURL> my-project
+## 動作
 
-cd my-project
+1. SD カード (SPI接続) とカメラ (OV3660) を初期化
+2. SD カード上の既存ファイルをスキャンし、連番の続きから保存を開始
+3. 一定間隔 (デフォルト 5秒) で JPEG 画像を撮影し、`img_0000.jpg`, `img_0001.jpg`, ... と連番で SD カードに保存
 
-# git 履歴をリセットして自分のリポジトリにする
-rm -rf .git && git init
-# または remote の向き先だけ変更する場合
-git remote set-url origin <自分のリポジトリURL>
+## ハードウェア
 
-just init chip=esp32s3
-```
+- [XIAO ESP32S3 Sense](https://wiki.seeedstudio.com/xiao_esp32s3_getting_started/)
+- microSD カード (FAT フォーマット)
 
-ディレクトリ名がそのままプロジェクト名になります。
+### ピン接続
+
+| 機能 | GPIO |
+|------|------|
+| SD MOSI | 9 |
+| SD MISO | 8 |
+| SD CLK | 7 |
+| SD CS | 21 |
+| カメラ | ボード内蔵 (XIAO ESP32S3 Sense) |
 
 ## 必要なもの
 
@@ -26,15 +30,20 @@ just init chip=esp32s3
 - [esptool](https://github.com/espressif/esptool) (`pip install esptool`) - 書き込み用
 - [pyserial](https://pypi.org/project/pyserial/) (`pip install pyserial`) - モニター用
 
-## クイックスタート
+## セットアップ
 
 ```bash
-# プロジェクト初期化 (デフォルト: esp32)
-just init
+git clone <リポジトリURL>
+cd xiao_sd_logger
 
-# ESP32-S3 の場合
+# 初回のみ: ターゲット設定 + ビルド
 just init chip=esp32s3
+just build
+```
 
+## ビルド・書き込み
+
+```bash
 # ビルド
 just build
 
@@ -48,23 +57,37 @@ just monitor
 just run
 ```
 
+## 設定の変更
+
+撮影間隔などの設定は `just menuconfig` で変更できる。設定値は `sdkconfig` に保存され、git 管理外のためリポジトリを汚さない。
+
+```bash
+just menuconfig
+```
+
+| 設定項目 | 場所 | デフォルト |
+|----------|------|-----------|
+| 撮影間隔 | App Configuration > Capture interval (ms) | 5000 |
+| PSRAM | Component config > ESP PSRAM | 有効 (Octal Mode) |
+| FAT LFN | Component config > FAT Filesystem support > Long filename support | Heap |
+
+初回ビルド時に `sdkconfig` が存在しない場合、`sdkconfig.defaults` の値が適用される。
+
 ## コマンド一覧
 
 | コマンド | 説明 |
 |---|---|
-| `just init chip=esp32` | プロジェクト初期化 + ターゲット設定 |
+| `just init chip=esp32s3` | プロジェクト初期化 + ターゲット設定 |
 | `just build` | ビルド |
 | `just menuconfig` | SDK 設定画面 (TUI) |
 | `just flash` | 書き込み |
 | `just monitor` | シリアルモニター |
 | `just run` | build → flash → monitor 一括実行 |
-| `just add-lib <name>` | ESP Component Registry からライブラリ追加 |
-| `just create-comp <name>` | ローカルコンポーネント作成 |
 | `just clean` | ビルド成果物を削除 |
 | `just fullclean` | ビルドディレクトリ全体を削除 |
 | `just size` | メモリ使用量の確認 |
 
-## オプション引数
+### オプション引数
 
 ```bash
 # ポートを指定 (デフォルト: /dev/ttyACM0)
@@ -77,32 +100,32 @@ just flash baud=921600
 just monitor baud=9600
 ```
 
-## ESP-IDF バージョンの変更
-
-```bash
-# 一時的に変更
-IDF_VERSION=v5.3 just build
-
-# プロジェクト固定 (.env ファイル)
-echo 'IDF_VERSION=v5.3' > .env
-```
-
 ## VS Code で補完を有効にする
 
-VS Code の **Dev Containers** 拡張をインストールし、コマンドパレットから `Dev Containers: Reopen in Container` を実行するとコンテナ内で VS Code が開きます。ESP-IDF のヘッダーが全て解決され、補完・定義ジャンプ・エラー表示が有効になります。
+VS Code の **Dev Containers** 拡張をインストールし、コマンドパレットから `Dev Containers: Reopen in Container` を実行する。ESP-IDF のヘッダーが解決され、補完・定義ジャンプが有効になる。
 
-ビルド・書き込み・モニターはホスト側のターミナルで `just` を使ってください。
+ビルド・書き込み・モニターはホスト側のターミナルで `just` を使う。
 
 ## プロジェクト構成
 
 ```
 .
-├── Justfile              # ビルド・書き込み等のコマンド定義
-├── CMakeLists.txt        # プロジェクトの CMake 設定
-├── sdkconfig.defaults    # デフォルトの SDK 設定
-├── .clang-format         # コードフォーマット設定
+├── Justfile                    # ビルド・書き込み等のコマンド定義
+├── CMakeLists.txt              # プロジェクトの CMake 設定
+├── sdkconfig.defaults          # デフォルトの SDK 設定
+├── .clang-format               # コードフォーマット設定
 ├── main/
 │   ├── CMakeLists.txt
-│   └── <project_name>.c  # エントリポイント (app_main)
-└── components/           # ローカルコンポーネント (任意)
+│   ├── Kconfig.projbuild       # menuconfig のアプリ設定定義
+│   └── xiao_sd_logger.c        # エントリポイント (app_main)
+└── components/
+    ├── sdcard_driver/           # SD カード (SPI) ドライバ
+    │   ├── include/
+    │   │   └── sdcard_driver.h
+    │   └── sdcard_driver.c
+    └── camera_driver/           # カメラドライバ
+        ├── include/
+        │   ├── camera_driver.h
+        │   └── xiao_esp32s3_camera_config.h
+        └── camera_driver.c
 ```
