@@ -1,0 +1,11 @@
+BasedOnStyle: LLVM
+# インデント幅（ESP-IDFの標準は4にござる）
+IndentWidth: 4
+# 列の制限（80は少々窮屈ゆえ、100〜120あたりが丸いかと）
+ColumnLimit: 100
+# ポインタの寄せ方（C言語なら右寄せ、C++派なら左寄せが主流）
+PointerAlignment: Right
+# インクルード順をアルファベット順に自動整理
+SortIncludes: true
+# 連続する空行を1つに制限（コードが間延びせぬように）
+MaxEmptyLinesToKeep: 1

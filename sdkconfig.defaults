@@ -1,0 +1,12 @@
+# コンパイラ警告を強化
+CONFIG_COMPILER_WARN_WRITE_STRINGS=y
+
+# スタックオーバーフロー検出（カナリア方式）
+CONFIG_FREERTOS_CHECK_STACKOVERFLOW_CANARY=y
+
+# C++例外・RTTIを無効化（メモリ節約）
+CONFIG_COMPILER_CXX_EXCEPTIONS=n
+CONFIG_COMPILER_CXX_RTTI=n
+
+# printfの浮動小数点サポートを無効化（コードサイズ削減）
+CONFIG_NEWLIB_NANO_FORMAT=y
