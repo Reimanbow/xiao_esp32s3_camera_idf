@@ -4,6 +4,9 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "sdcard_driver.h"
+#include "camera_driver.h"
+
+static const char *filename = "/sdcard/img.jpg";
 
 static const char *TAG = "main";
 static const char *TEST_FILE = "/sdcard/test.txt";
@@ -30,6 +33,31 @@ void app_main(void)
         return;
     }
     ESP_LOGI(TAG, "Wrote: %s", TEST_DATA);
+
+    ret = camera_init();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Camera init failed: %s", esp_err_to_name(ret));
+        return;
+    }
+
+    size_t buf_size = 100 * 1024; // 100KB (VGA JPEG は通常 20〜80KB)
+    uint8_t *img_buf = malloc(buf_size);
+    if (!img_buf) {
+        ESP_LOGE(TAG, "Failed allocate memory");
+        return;
+    }
+
+    size_t img_size = 0;
+    ret = camera_get_image(img_buf, buf_size, &img_size);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get image");
+        free(img_buf);
+        return;
+    }
+
+    ESP_LOGI(TAG, "Captured image: %u bytes", img_size);
+    sdcard_write(filename, img_buf, img_size);
+    free(img_buf);
 
     char buf[64];
     while (1) {

@@ -10,3 +10,7 @@ CONFIG_COMPILER_CXX_RTTI=n
 
 # printfの浮動小数点サポートを無効化（コードサイズ削減）
 CONFIG_NEWLIB_NANO_FORMAT=y
+
+# PSRAM有効化（カメラのフレームバッファ用）
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
