@@ -1,4 +1,6 @@
+#include <dirent.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -6,11 +8,68 @@
 #include "sdcard_driver.h"
 #include "camera_driver.h"
 
-static const char *filename = "/sdcard/img.jpg";
-
 static const char *TAG = "main";
-static const char *TEST_FILE = "/sdcard/test.txt";
-static const char *TEST_DATA = "Hello, SD card!";
+
+#define IMG_BUF_SIZE (100 * 1024)
+
+static void make_filename(char *buf, size_t buf_len, int seq)
+{
+    snprintf(buf, buf_len, "/sdcard/img_%04d.jpg", seq);
+}
+
+static int find_next_seq(void)
+{
+    int max_seq = -1;
+    DIR *dir = opendir("/sdcard");
+    if (!dir) {
+        return 0;
+    }
+
+    struct dirent *ent;
+    while ((ent = readdir(dir)) != NULL) {
+        int n;
+        if (sscanf(ent->d_name, "img_%d.jpg", &n) == 1 && n > max_seq) {
+            max_seq = n;
+        }
+    }
+    closedir(dir);
+
+    return max_seq + 1;
+}
+
+static void capture_loop(void)
+{
+    uint8_t *img_buf = malloc(IMG_BUF_SIZE);
+    if (!img_buf) {
+        ESP_LOGE(TAG, "Failed to allocate image buffer");
+        return;
+    }
+
+    int seq = find_next_seq();
+    ESP_LOGI(TAG, "Starting from seq %d", seq);
+    while (1) {
+        size_t img_size = 0;
+        esp_err_t ret = camera_get_image(img_buf, IMG_BUF_SIZE, &img_size);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to capture image");
+            vTaskDelay(pdMS_TO_TICKS(CONFIG_CAPTURE_INTERVAL_MS));
+            continue;
+        }
+
+        char path[32];
+        make_filename(path, sizeof(path), seq);
+
+        ret = sdcard_write(path, img_buf, img_size);
+        if (ret == ESP_OK) {
+            ESP_LOGI(TAG, "[%04d] Saved %u bytes -> %s", seq, img_size, path);
+            seq++;
+        } else {
+            ESP_LOGE(TAG, "Failed to write %s", path);
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(CONFIG_CAPTURE_INTERVAL_MS));
+    }
+}
 
 void app_main(void)
 {
@@ -27,48 +86,11 @@ void app_main(void)
         return;
     }
 
-    ret = sdcard_write(TEST_FILE, TEST_DATA, strlen(TEST_DATA));
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Write failed");
-        return;
-    }
-    ESP_LOGI(TAG, "Wrote: %s", TEST_DATA);
-
     ret = camera_init();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Camera init failed: %s", esp_err_to_name(ret));
         return;
     }
 
-    size_t buf_size = 100 * 1024; // 100KB (VGA JPEG は通常 20〜80KB)
-    uint8_t *img_buf = malloc(buf_size);
-    if (!img_buf) {
-        ESP_LOGE(TAG, "Failed allocate memory");
-        return;
-    }
-
-    size_t img_size = 0;
-    ret = camera_get_image(img_buf, buf_size, &img_size);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to get image");
-        free(img_buf);
-        return;
-    }
-
-    ESP_LOGI(TAG, "Captured image: %u bytes", img_size);
-    sdcard_write(filename, img_buf, img_size);
-    free(img_buf);
-
-    char buf[64];
-    while (1) {
-        size_t read_len = 0;
-        ret = sdcard_read(TEST_FILE, buf, sizeof(buf) - 1, &read_len);
-        if (ret == ESP_OK) {
-            buf[read_len] = '\0';
-            ESP_LOGI(TAG, "Read: %s", buf);
-        } else {
-            ESP_LOGE(TAG, "Read failed");
-        }
-        vTaskDelay(pdMS_TO_TICKS(3000));
-    }
+    capture_loop();
 }
