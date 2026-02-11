@@ -11,11 +11,10 @@
 
 static const char *TAG = "main";
 
-#define IMG_BUF_SIZE (100 * 1024)
 
 static void make_filename(char *buf, size_t buf_len, int seq)
 {
-    snprintf(buf, buf_len, "/sdcard/img_%04d.jpg", seq);
+    snprintf(buf, buf_len, "/sdcard/img_%04d%s", seq, camera_get_file_ext());
 }
 
 static int find_next_seq(void)
@@ -26,10 +25,14 @@ static int find_next_seq(void)
         return 0;
     }
 
+    const char *ext = camera_get_file_ext();
+    char fmt[32];
+    snprintf(fmt, sizeof(fmt), "img_%%d%s", ext);
+
     struct dirent *ent;
     while ((ent = readdir(dir)) != NULL) {
         int n;
-        if (sscanf(ent->d_name, "img_%d.jpg", &n) == 1 && n > max_seq) {
+        if (sscanf(ent->d_name, fmt, &n) == 1 && n > max_seq) {
             max_seq = n;
         }
     }
@@ -38,9 +41,50 @@ static int find_next_seq(void)
     return max_seq + 1;
 }
 
+static void swap_bytes_16(uint8_t *data, size_t size)
+{
+    for (size_t i = 0; i + 1 < size; i += 2) {
+        uint8_t tmp = data[i];
+        data[i] = data[i + 1];
+        data[i + 1] = tmp;
+    }
+}
+
+static esp_err_t save_image(const char *path, uint8_t *data, size_t data_size)
+{
+    char header[128];
+    size_t header_size = camera_get_file_header(header, sizeof(header));
+
+    if (header_size == 0) {
+        return sdcard_write(path, data, data_size);
+    }
+
+    // RGB565: カメラはビッグエンディアンで出力、BMPはリトルエンディアンを期待
+    if (camera_get_file_ext()[1] == 'b') { // ".bmp"
+        swap_bytes_16(data, data_size);
+    }
+
+    FILE *f = fopen(path, "wb");
+    if (!f) {
+        ESP_LOGE(TAG, "Failed to open file: %s", path);
+        return ESP_FAIL;
+    }
+    size_t written = fwrite(header, 1, header_size, f);
+    written += fwrite(data, 1, data_size, f);
+    fclose(f);
+
+    if (written != header_size + data_size) {
+        ESP_LOGE(TAG, "Write incomplete: %s", path);
+        return ESP_FAIL;
+    }
+    return ESP_OK;
+}
+
 static void capture_loop(void)
 {
-    uint8_t *img_buf = malloc(IMG_BUF_SIZE);
+    size_t buf_size = camera_get_buf_size();
+    ESP_LOGI(TAG, "Image buffer size: %u bytes", buf_size);
+    uint8_t *img_buf = malloc(buf_size);
     if (!img_buf) {
         ESP_LOGE(TAG, "Failed to allocate image buffer");
         return;
@@ -50,17 +94,17 @@ static void capture_loop(void)
     ESP_LOGI(TAG, "Starting from seq %d", seq);
     while (1) {
         size_t img_size = 0;
-        esp_err_t ret = camera_get_image(img_buf, IMG_BUF_SIZE, &img_size);
+        esp_err_t ret = camera_get_image(img_buf, buf_size, &img_size);
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "Failed to capture image");
             vTaskDelay(pdMS_TO_TICKS(CONFIG_CAPTURE_INTERVAL_MS));
             continue;
         }
 
-        char path[32];
+        char path[48];
         make_filename(path, sizeof(path), seq);
 
-        ret = sdcard_write(path, img_buf, img_size);
+        ret = save_image(path, img_buf, img_size);
         if (ret == ESP_OK) {
             ESP_LOGI(TAG, "[%04d] Saved %u bytes -> %s", seq, img_size, path);
             seq++;

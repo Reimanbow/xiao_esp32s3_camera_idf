@@ -1,0 +1,48 @@
+menu "Camera Driver"
+
+    choice CAMERA_PIXEL_FORMAT
+        prompt "Pixel format"
+        default CAMERA_PIXEL_FORMAT_JPEG
+        help
+            Output pixel format of the camera.
+
+        config CAMERA_PIXEL_FORMAT_JPEG
+            bool "JPEG"
+        config CAMERA_PIXEL_FORMAT_RGB565
+            bool "RGB565"
+        config CAMERA_PIXEL_FORMAT_GRAYSCALE
+            bool "Grayscale"
+    endchoice
+
+    choice CAMERA_FRAME_SIZE
+        prompt "Frame size"
+        default CAMERA_FRAME_SIZE_VGA
+        help
+            Resolution of captured images.
+
+        config CAMERA_FRAME_SIZE_96X96
+            bool "96x96"
+        config CAMERA_FRAME_SIZE_QVGA
+            bool "QVGA (320x240)"
+        config CAMERA_FRAME_SIZE_VGA
+            bool "VGA (640x480)"
+        config CAMERA_FRAME_SIZE_SVGA
+            bool "SVGA (800x600)"
+        config CAMERA_FRAME_SIZE_XGA
+            bool "XGA (1024x768)"
+        config CAMERA_FRAME_SIZE_SXGA
+            bool "SXGA (1280x1024)"
+        config CAMERA_FRAME_SIZE_UXGA
+            bool "UXGA (1600x1200)"
+    endchoice
+
+    config CAMERA_JPEG_QUALITY
+        int "JPEG quality (0-63, lower is better)"
+        default 12
+        range 0 63
+        depends on CAMERA_PIXEL_FORMAT_JPEG
+        help
+            JPEG compression quality. Lower values produce higher quality
+            images but larger file sizes.
+
+endmenu
