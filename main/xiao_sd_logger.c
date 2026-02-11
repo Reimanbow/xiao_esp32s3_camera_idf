@@ -7,6 +7,7 @@
 #include "esp_log.h"
 #include "sdcard_driver.h"
 #include "camera_driver.h"
+#include "log_router.h"
 
 static const char *TAG = "main";
 
@@ -85,6 +86,12 @@ void app_main(void)
         ESP_LOGE(TAG, "SD init failed: %s", esp_err_to_name(ret));
         return;
     }
+
+    ret = esp_log_router_to_file("/sdcard/log.txt", NULL, ESP_LOG_INFO);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Log router init failed: %s", esp_err_to_name(ret));
+    }
+    ESP_LOGI(TAG, "=== BOOT ===");
 
     ret = camera_init();
     if (ret != ESP_OK) {
